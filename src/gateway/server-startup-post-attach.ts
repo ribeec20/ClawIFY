@@ -84,7 +84,7 @@ export async function startGatewaySidecars(params: {
   defaultWorkspaceDir: string;
   deps: CliDeps;
   startChannels: () => Promise<void>;
-  startChannelsEnabled: boolean;
+  channelStartupEnabled: boolean;
   log: { warn: (msg: string) => void };
   logHooks: {
     info: (msg: string) => void;
@@ -158,7 +158,7 @@ export async function startGatewaySidecars(params: {
   }
 
   const skipChannels =
-    !params.startChannelsEnabled ||
+    !params.channelStartupEnabled ||
     isTruthyEnvValue(process.env.OPENCLAW_SKIP_CHANNELS) ||
     isTruthyEnvValue(process.env.OPENCLAW_SKIP_PROVIDERS);
   if (!skipChannels) {
@@ -259,7 +259,7 @@ export async function startGatewayPostAttachRuntime(params: {
   defaultWorkspaceDir: string;
   deps: CliDeps;
   startChannels: () => Promise<void>;
-  startChannelsEnabled: boolean;
+  channelStartupEnabled: boolean;
   logHooks: {
     info: (msg: string) => void;
     warn: (msg: string) => void;
@@ -311,7 +311,7 @@ export async function startGatewayPostAttachRuntime(params: {
       defaultWorkspaceDir: params.defaultWorkspaceDir,
       deps: params.deps,
       startChannels: params.startChannels,
-      startChannelsEnabled: params.startChannelsEnabled,
+      channelStartupEnabled: params.channelStartupEnabled,
       log: params.log,
       logHooks: params.logHooks,
       logChannels: params.logChannels,

@@ -761,7 +761,7 @@ export async function startGatewayServer(
       defaultWorkspaceDir,
       deps,
       startChannels,
-      startChannelsEnabled: channelsStartupEnabled,
+      channelStartupEnabled: channelsStartupEnabled,
       logHooks,
       logChannels,
       unavailableGatewayMethods,
