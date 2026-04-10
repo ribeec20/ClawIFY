@@ -37,6 +37,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PNPM_CONFIG_MINIMUM_RELEASE_AGE: "0"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
