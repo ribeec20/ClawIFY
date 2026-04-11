@@ -27,6 +27,7 @@ describe("method scope resolution", () => {
   it.each([
     ["sessions.resolve", ["operator.read"]],
     ["config.schema.lookup", ["operator.read"]],
+    ["clawify.instances.list", ["operator.read"]],
     ["sessions.create", ["operator.write"]],
     ["sessions.send", ["operator.write"]],
     ["sessions.abort", ["operator.write"]],
@@ -35,6 +36,7 @@ describe("method scope resolution", () => {
     ["node.pair.approve", ["operator.pairing"]],
     ["poll", ["operator.write"]],
     ["config.patch", ["operator.admin"]],
+    ["tools.update", ["operator.admin"]],
     ["wizard.start", ["operator.admin"]],
     ["update.run", ["operator.admin"]],
   ])("resolves least-privilege scopes for %s", (method, expected) => {

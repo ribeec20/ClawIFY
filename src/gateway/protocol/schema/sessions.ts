@@ -85,6 +85,8 @@ export const SessionsCreateParamsSchema = Type.Object(
   {
     key: Type.Optional(NonEmptyString),
     agentId: Type.Optional(NonEmptyString),
+    instanceId: Type.Optional(NonEmptyString),
+    userId: Type.Optional(NonEmptyString),
     label: Type.Optional(SessionLabelString),
     model: Type.Optional(NonEmptyString),
     parentSessionKey: Type.Optional(NonEmptyString),
@@ -98,6 +100,8 @@ export const SessionsSendParamsSchema = Type.Object(
   {
     key: NonEmptyString,
     message: Type.String(),
+    instanceId: Type.Optional(NonEmptyString),
+    userId: Type.Optional(NonEmptyString),
     thinking: Type.Optional(Type.String()),
     attachments: Type.Optional(Type.Array(Type.Unknown())),
     timeoutMs: Type.Optional(Type.Integer({ minimum: 0 })),

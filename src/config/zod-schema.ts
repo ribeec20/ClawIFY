@@ -223,9 +223,92 @@ const McpServerSchema = z
   })
   .catchall(z.unknown());
 
-const McpConfigSchema = z
+const McpConfigObjectSchema = z
   .object({
     servers: z.record(z.string(), McpServerSchema).optional(),
+  })
+  .strict();
+
+const McpConfigSchema = McpConfigObjectSchema.optional();
+
+const ClawifyScopedToolPolicySchema = z
+  .object({
+    allow: z.array(z.string()).optional(),
+    alsoAllow: z.array(z.string()).optional(),
+    deny: z.array(z.string()).optional(),
+    profile: z
+      .union([
+        z.literal("minimal"),
+        z.literal("coding"),
+        z.literal("messaging"),
+        z.literal("full"),
+      ])
+      .optional(),
+    byProvider: z
+      .record(
+        z.string(),
+        z
+          .object({
+            allow: z.array(z.string()).optional(),
+            alsoAllow: z.array(z.string()).optional(),
+            deny: z.array(z.string()).optional(),
+            profile: z
+              .union([
+                z.literal("minimal"),
+                z.literal("coding"),
+                z.literal("messaging"),
+                z.literal("full"),
+              ])
+              .optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict();
+
+const ClawifyScopedSkillsSchema = z
+  .object({
+    entries: z.record(z.string(), SkillEntrySchema).optional(),
+  })
+  .strict();
+
+const ClawifyUserMutationPolicySchema = z.union([
+  z.literal("none"),
+  z.literal("allowlist-extend"),
+  z.literal("replace"),
+]);
+
+const ClawifyUserPolicySchema = z
+  .object({
+    tools: ClawifyUserMutationPolicySchema.optional(),
+    skills: ClawifyUserMutationPolicySchema.optional(),
+    mcp: ClawifyUserMutationPolicySchema.optional(),
+  })
+  .strict();
+
+const ClawifyUserConfigSchema = z
+  .object({
+    tools: ClawifyScopedToolPolicySchema.optional(),
+    skills: ClawifyScopedSkillsSchema.optional(),
+    mcp: McpConfigObjectSchema.optional(),
+  })
+  .strict();
+
+const ClawifyInstanceConfigSchema = z
+  .object({
+    tools: ClawifyScopedToolPolicySchema.optional(),
+    skills: ClawifyScopedSkillsSchema.optional(),
+    mcp: McpConfigObjectSchema.optional(),
+    userPolicy: ClawifyUserPolicySchema.optional(),
+    users: z.record(z.string(), ClawifyUserConfigSchema).optional(),
+  })
+  .strict();
+
+const ClawifyConfigSchema = z
+  .object({
+    defaultInstanceId: z.string().optional(),
+    instances: z.record(z.string(), ClawifyInstanceConfigSchema).optional(),
   })
   .strict()
   .optional();
@@ -901,6 +984,7 @@ export const OpenClawSchema = z
       .optional(),
     memory: MemorySchema,
     mcp: McpConfigSchema,
+    clawify: ClawifyConfigSchema,
     skills: z
       .object({
         allowBundled: z.array(z.string()).optional(),

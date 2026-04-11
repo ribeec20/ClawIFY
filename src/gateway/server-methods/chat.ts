@@ -13,6 +13,7 @@ import { dispatchInboundMessage } from "../../auto-reply/dispatch.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import type { MsgContext } from "../../auto-reply/templating.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
+import { applyClawifyScopeToConfig, normalizeClawifyScope } from "../../config/clawify-scope.js";
 import { resolveSessionFilePath } from "../../config/sessions.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import { jsonUtf8Bytes } from "../../infra/json-utf8-bytes.js";
@@ -1491,7 +1492,16 @@ export const chatHandlers: GatewayRequestHandlers = {
     // marker injection on the model's image capability. This prevents opaque
     // media:// markers from leaking into prompts for text-only model runs.
     const rawSessionKey = p.sessionKey;
-    const { cfg, entry, canonicalKey: sessionKey } = loadSessionEntry(rawSessionKey);
+    const loadedSession = loadSessionEntry(rawSessionKey);
+    const entry = loadedSession.entry;
+    const sessionKey = loadedSession.canonicalKey;
+    const cfg = applyClawifyScopeToConfig({
+      cfg: loadedSession.cfg,
+      scope: normalizeClawifyScope({
+        instanceId: entry?.clawifyInstanceId,
+        userId: entry?.clawifyUserId,
+      }),
+    });
 
     let parsedMessage = inboundMessage;
     let parsedImages: ChatImageContent[] = [];

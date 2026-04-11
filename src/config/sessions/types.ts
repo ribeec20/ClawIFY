@@ -234,6 +234,14 @@ export type SessionEntry = {
   cliSessionIds?: Record<string, string>;
   cliSessionBindings?: Record<string, CliSessionBinding>;
   claudeCliSessionId?: string;
+  /**
+   * Optional clawify instance id applied to this session for scoped tools/skills/mcp config.
+   */
+  clawifyInstanceId?: string;
+  /**
+   * Optional clawify user id applied to this session for per-user scoped config.
+   */
+  clawifyUserId?: string;
   label?: string;
   displayName?: string;
   channel?: string;

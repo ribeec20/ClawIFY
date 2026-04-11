@@ -13,6 +13,7 @@ import { installSkill } from "../../agents/skills-install.js";
 import { buildWorkspaceSkillStatus } from "../../agents/skills-status.js";
 import { loadWorkspaceSkillEntries, type SkillEntry } from "../../agents/skills.js";
 import { listAgentWorkspaceDirs } from "../../agents/workspace-dirs.js";
+import { resolveClawifyInstanceConfig } from "../../config/clawify-scope.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { loadConfig, writeConfigFile } from "../../config/config.js";
 import { fetchClawHubSkillDetail } from "../../infra/clawhub.js";
@@ -33,6 +34,26 @@ import {
   validateSkillsUpdateParams,
 } from "../protocol/index.js";
 import type { GatewayRequestHandlers } from "./types.js";
+
+type ResolvedSkillsScope =
+  | null
+  | {
+      instanceId: string;
+      userId?: string;
+      instance: Record<string, unknown>;
+      mode: "none" | "allowlist-extend" | "replace";
+    }
+  | {
+      error: string;
+    };
+
+function resolveUserMutationMode(value: unknown): "none" | "allowlist-extend" | "replace" {
+  const normalized = normalizeOptionalString(value)?.toLowerCase();
+  if (normalized === "none" || normalized === "allowlist-extend" || normalized === "replace") {
+    return normalized;
+  }
+  return "allowlist-extend";
+}
 
 function collectSkillBins(entries: SkillEntry[]): string[] {
   const bins = new Set<string>();
@@ -302,11 +323,69 @@ export const skillsHandlers: GatewayRequestHandlers = {
       enabled?: boolean;
       apiKey?: string;
       env?: Record<string, string>;
+      instanceId?: string;
+      userId?: string;
     };
     const cfg = loadConfig();
-    const skills = cfg.skills ? { ...cfg.skills } : {};
-    const entries = skills.entries ? { ...skills.entries } : {};
-    const current = entries[p.skillKey] ? { ...entries[p.skillKey] } : {};
+    let targetConfig: OpenClawConfig = { ...cfg };
+    const resolvedScope: ResolvedSkillsScope = (() => {
+      const requestedInstanceId = normalizeOptionalString(p.instanceId);
+      const requestedUserId = normalizeOptionalString(p.userId);
+      if (!requestedInstanceId && !requestedUserId) {
+        return null;
+      }
+      const resolvedInstance = resolveClawifyInstanceConfig({
+        cfg,
+        instanceId: requestedInstanceId,
+      });
+      if (resolvedInstance) {
+        return {
+          instanceId: resolvedInstance.instanceId,
+          userId: requestedUserId,
+          instance: {
+            ...resolvedInstance.instance,
+          } as Record<string, unknown>,
+          mode:
+            resolveUserMutationMode(
+              (resolvedInstance.instance.userPolicy as { skills?: unknown } | undefined)?.skills,
+            ),
+        };
+      }
+      if (!requestedInstanceId) {
+        return {
+          error:
+            "userId was provided but no clawify instance is configured and no default instance is set",
+        };
+      }
+      return {
+        instanceId: requestedInstanceId,
+        userId: requestedUserId,
+        instance: {},
+        mode: "allowlist-extend",
+      };
+    })();
+    if (resolvedScope && "error" in resolvedScope) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, resolvedScope.error));
+      return;
+    }
+    const getCurrentSkillEntry = () => {
+      if (!resolvedScope) {
+        return (targetConfig.skills?.entries?.[p.skillKey] ?? {}) as Record<string, unknown>;
+      }
+      const instanceSkillsEntries =
+        ((resolvedScope.instance.skills as { entries?: Record<string, unknown> } | undefined)
+          ?.entries as Record<string, unknown> | undefined) ?? {};
+      if (!resolvedScope.userId) {
+        return (instanceSkillsEntries[p.skillKey] as Record<string, unknown> | undefined) ?? {};
+      }
+      const userEntry = (
+        ((resolvedScope.instance.users as Record<string, unknown> | undefined)?.[
+          resolvedScope.userId
+        ] as { skills?: { entries?: Record<string, unknown> } } | undefined) ?? {}
+      ).skills?.entries?.[p.skillKey];
+      return (userEntry as Record<string, unknown> | undefined) ?? {};
+    };
+    const current = { ...getCurrentSkillEntry() };
     if (typeof p.enabled === "boolean") {
       current.enabled = p.enabled;
     }
@@ -319,7 +398,10 @@ export const skillsHandlers: GatewayRequestHandlers = {
       }
     }
     if (p.env && typeof p.env === "object") {
-      const nextEnv = current.env ? { ...current.env } : {};
+      const nextEnv: Record<string, string> =
+        current.env && typeof current.env === "object"
+          ? { ...(current.env as Record<string, string>) }
+          : {};
       for (const [key, value] of Object.entries(p.env)) {
         const trimmedKey = key.trim();
         if (!trimmedKey) {
@@ -334,13 +416,84 @@ export const skillsHandlers: GatewayRequestHandlers = {
       }
       current.env = nextEnv;
     }
-    entries[p.skillKey] = current;
-    skills.entries = entries;
-    const nextConfig: OpenClawConfig = {
-      ...cfg,
-      skills,
-    };
-    await writeConfigFile(nextConfig);
+    if (!resolvedScope) {
+      const skills = targetConfig.skills ? { ...targetConfig.skills } : {};
+      const entries = skills.entries ? { ...skills.entries } : {};
+      entries[p.skillKey] = current;
+      skills.entries = entries;
+      targetConfig = {
+        ...targetConfig,
+        skills,
+      };
+    } else {
+      const clawify = {
+        ...(targetConfig.clawify ?? {}),
+      };
+      const instances = {
+        ...(clawify.instances ?? {}),
+      };
+      const instance = {
+        ...resolvedScope.instance,
+      };
+      if (!resolvedScope.userId) {
+        const skills = (instance.skills as { entries?: Record<string, unknown> } | undefined) ?? {};
+        const entries = {
+          ...(skills.entries ?? {}),
+        };
+        entries[p.skillKey] = current;
+        instance.skills = {
+          ...skills,
+          entries,
+        };
+      } else {
+        const mode = resolvedScope.mode;
+        if (mode === "none") {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.INVALID_REQUEST,
+              `user skill mutation is disabled for instance "${resolvedScope.instanceId}"`,
+            ),
+          );
+          return;
+        }
+        const users = {
+          ...((instance.users as Record<string, unknown> | undefined) ?? {}),
+        };
+        const user = ((users[resolvedScope.userId] as Record<string, unknown> | undefined) ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const userSkills = (user.skills as { entries?: Record<string, unknown> } | undefined) ?? {};
+        const userEntries = {
+          ...(userSkills.entries ?? {}),
+        };
+        userEntries[p.skillKey] =
+          mode === "allowlist-extend"
+            ? {
+                ...((userEntries[p.skillKey] as Record<string, unknown> | undefined) ?? {}),
+                ...current,
+              }
+            : current;
+        user.skills = {
+          ...userSkills,
+          entries: userEntries,
+        };
+        users[resolvedScope.userId] = user;
+        instance.users = users;
+      }
+      instances[resolvedScope.instanceId] = instance;
+      clawify.instances = instances;
+      if (!normalizeOptionalString(clawify.defaultInstanceId)) {
+        clawify.defaultInstanceId = resolvedScope.instanceId;
+      }
+      targetConfig = {
+        ...targetConfig,
+        clawify,
+      };
+    }
+    await writeConfigFile(targetConfig);
     respond(true, { ok: true, skillKey: p.skillKey, config: current }, undefined);
   },
 };

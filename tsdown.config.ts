@@ -131,6 +131,7 @@ function shouldNeverBundleDependency(id: string): boolean {
 function buildCoreDistEntries(): Record<string, string> {
   return {
     index: "src/index.ts",
+    "gateway/clawify-sdk": "src/gateway/clawify-sdk.ts",
     entry: "src/entry.ts",
     // Ensure this module is bundled as an entry so legacy CLI shims can resolve its exports.
     "cli/daemon-cli": "src/cli/daemon-cli.ts",

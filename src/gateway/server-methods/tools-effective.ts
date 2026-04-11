@@ -1,3 +1,4 @@
+import { applyClawifyScopeToConfig, normalizeClawifyScope } from "../../config/clawify-scope.js";
 import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import { ADMIN_SCOPE } from "../method-scopes.js";
 import {
@@ -55,9 +56,16 @@ function resolveTrustedToolsEffectiveContext(params: {
     return null;
   }
 
+  const scopedCfg = applyClawifyScopeToConfig({
+    cfg: loaded.cfg,
+    scope: normalizeClawifyScope({
+      instanceId: loaded.entry.clawifyInstanceId,
+      userId: loaded.entry.clawifyUserId,
+    }),
+  });
   const sessionAgentId = resolveSessionAgentId({
     sessionKey: loaded.canonicalKey ?? params.sessionKey,
-    config: loaded.cfg,
+    config: scopedCfg,
   });
   if (params.requestedAgentId && params.requestedAgentId !== sessionAgentId) {
     params.respond(
@@ -72,9 +80,9 @@ function resolveTrustedToolsEffectiveContext(params: {
   }
 
   const delivery = deliveryContextFromSession(loaded.entry);
-  const resolvedModel = resolveSessionModelRef(loaded.cfg, loaded.entry, sessionAgentId);
+  const resolvedModel = resolveSessionModelRef(scopedCfg, loaded.entry, sessionAgentId);
   return {
-    cfg: loaded.cfg,
+    cfg: scopedCfg,
     agentId: sessionAgentId,
     senderIsOwner: params.senderIsOwner,
     modelProvider: resolvedModel.provider,

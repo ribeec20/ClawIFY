@@ -479,6 +479,28 @@ async function handleSessionSend(params: {
     interruptedActiveRun = interruptResult.interrupted;
   }
 
+  const scopedInstanceId = normalizeOptionalString((p as { instanceId?: unknown }).instanceId);
+  const scopedUserId = normalizeOptionalString((p as { userId?: unknown }).userId);
+  if (scopedInstanceId !== undefined || scopedUserId !== undefined) {
+    await updateSessionStore(storePath, (store) => {
+      const current = store[canonicalKey];
+      if (!current) {
+        return;
+      }
+      if (scopedInstanceId === undefined) {
+        delete current.clawifyInstanceId;
+      } else {
+        current.clawifyInstanceId = scopedInstanceId;
+      }
+      if (scopedUserId === undefined) {
+        delete current.clawifyUserId;
+      } else {
+        current.clawifyUserId = scopedUserId;
+      }
+      current.updatedAt = Date.now();
+    });
+  }
+
   const messageSeq = readSessionMessages(entry.sessionId, storePath, entry.sessionFile).length + 1;
   let sendAcked = false;
   let sendPayload: unknown;
@@ -832,13 +854,29 @@ export const sessionsHandlers: GatewayRequestHandlers = {
         },
         loadGatewayModelCatalog: context.loadGatewayModelCatalog,
       });
-      if (!patched.ok || !canonicalParentSessionKey) {
+      if (!patched.ok) {
         return patched;
       }
-      const nextEntry: SessionEntry = {
-        ...patched.entry,
-        parentSessionKey: canonicalParentSessionKey,
-      };
+      const instanceId = normalizeOptionalString((p as { instanceId?: unknown }).instanceId);
+      const userId = normalizeOptionalString((p as { userId?: unknown }).userId);
+      if (!canonicalParentSessionKey && instanceId === undefined && userId === undefined) {
+        return patched;
+      }
+      const nextEntry: SessionEntry = { ...patched.entry };
+      if (canonicalParentSessionKey) {
+        nextEntry.parentSessionKey = canonicalParentSessionKey;
+      }
+      if (instanceId === undefined) {
+        delete nextEntry.clawifyInstanceId;
+      } else {
+        nextEntry.clawifyInstanceId = instanceId;
+      }
+      if (userId === undefined) {
+        delete nextEntry.clawifyUserId;
+      } else {
+        nextEntry.clawifyUserId = userId;
+      }
+      nextEntry.updatedAt = Date.now();
       store[target.canonicalKey] = nextEntry;
       return {
         ...patched,

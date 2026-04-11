@@ -13,6 +13,7 @@ describe("legacy root entry", () => {
 
     expect(packageJson.main).toBe("dist/index.js");
     expect(packageJson.exports?.["."]).toBe("./dist/index.js");
+    expect(packageJson.exports?.["./sdk"]).toBe("./dist/gateway/clawify-sdk.js");
   });
 
   it("does not run CLI bootstrap when imported as a library dependency", () => {

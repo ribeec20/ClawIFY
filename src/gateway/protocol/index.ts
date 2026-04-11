@@ -249,6 +249,8 @@ import {
   SkillsStatusParamsSchema,
   type SkillsUpdateParams,
   SkillsUpdateParamsSchema,
+  type ToolsUpdateParams,
+  ToolsUpdateParamsSchema,
   type ToolsCatalogParams,
   ToolsCatalogParamsSchema,
   type ToolsCatalogResult,
@@ -271,6 +273,32 @@ import {
   WebLoginStartParamsSchema,
   type WebLoginWaitParams,
   WebLoginWaitParamsSchema,
+  type ClawifyInstanceConfig,
+  ClawifyInstanceConfigSchema,
+  type ClawifyInstanceDeleteParams,
+  ClawifyInstanceDeleteParamsSchema,
+  type ClawifyInstanceGetParams,
+  ClawifyInstanceGetParamsSchema,
+  type ClawifyInstanceGetResult,
+  ClawifyInstanceGetResultSchema,
+  type ClawifyInstanceUpsertParams,
+  ClawifyInstanceUpsertParamsSchema,
+  type ClawifyInstancesListParams,
+  ClawifyInstancesListParamsSchema,
+  type ClawifyInstancesListResult,
+  ClawifyInstancesListResultSchema,
+  type ClawifyMutationResult,
+  ClawifyMutationResultSchema,
+  type ClawifyUserConfig,
+  ClawifyUserConfigSchema,
+  type ClawifyUserDeleteParams,
+  ClawifyUserDeleteParamsSchema,
+  type ClawifyUserGetParams,
+  ClawifyUserGetParamsSchema,
+  type ClawifyUserGetResult,
+  ClawifyUserGetResultSchema,
+  type ClawifyUserUpsertParams,
+  ClawifyUserUpsertParamsSchema,
   type WizardCancelParams,
   WizardCancelParamsSchema,
   type WizardNextParams,
@@ -434,6 +462,7 @@ export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBins
 export const validateSkillsInstallParams =
   ajv.compile<SkillsInstallParams>(SkillsInstallParamsSchema);
 export const validateSkillsUpdateParams = ajv.compile<SkillsUpdateParams>(SkillsUpdateParamsSchema);
+export const validateToolsUpdateParams = ajv.compile<ToolsUpdateParams>(ToolsUpdateParamsSchema);
 export const validateSkillsSearchParams = ajv.compile<SkillsSearchParams>(SkillsSearchParamsSchema);
 export const validateSkillsDetailParams = ajv.compile<SkillsDetailParams>(SkillsDetailParamsSchema);
 export const validateCronListParams = ajv.compile<CronListParams>(CronListParamsSchema);
@@ -460,6 +489,39 @@ export const validateDeviceTokenRotateParams = ajv.compile<DeviceTokenRotatePara
 );
 export const validateDeviceTokenRevokeParams = ajv.compile<DeviceTokenRevokeParams>(
   DeviceTokenRevokeParamsSchema,
+);
+export const validateClawifyInstancesListParams = ajv.compile<ClawifyInstancesListParams>(
+  ClawifyInstancesListParamsSchema,
+);
+export const validateClawifyInstanceGetParams = ajv.compile<ClawifyInstanceGetParams>(
+  ClawifyInstanceGetParamsSchema,
+);
+export const validateClawifyInstanceUpsertParams = ajv.compile<ClawifyInstanceUpsertParams>(
+  ClawifyInstanceUpsertParamsSchema,
+);
+export const validateClawifyInstanceDeleteParams = ajv.compile<ClawifyInstanceDeleteParams>(
+  ClawifyInstanceDeleteParamsSchema,
+);
+export const validateClawifyUserGetParams = ajv.compile<ClawifyUserGetParams>(
+  ClawifyUserGetParamsSchema,
+);
+export const validateClawifyUserUpsertParams = ajv.compile<ClawifyUserUpsertParams>(
+  ClawifyUserUpsertParamsSchema,
+);
+export const validateClawifyUserDeleteParams = ajv.compile<ClawifyUserDeleteParams>(
+  ClawifyUserDeleteParamsSchema,
+);
+export const validateClawifyInstancesListResult = ajv.compile<ClawifyInstancesListResult>(
+  ClawifyInstancesListResultSchema,
+);
+export const validateClawifyInstanceGetResult = ajv.compile<ClawifyInstanceGetResult>(
+  ClawifyInstanceGetResultSchema,
+);
+export const validateClawifyUserGetResult = ajv.compile<ClawifyUserGetResult>(
+  ClawifyUserGetResultSchema,
+);
+export const validateClawifyMutationResult = ajv.compile<ClawifyMutationResult>(
+  ClawifyMutationResultSchema,
 );
 export const validateExecApprovalsGetParams = ajv.compile<ExecApprovalsGetParams>(
   ExecApprovalsGetParamsSchema,
@@ -634,6 +696,7 @@ export {
   SkillsDetailParamsSchema,
   SkillsDetailResultSchema,
   SkillsUpdateParamsSchema,
+  ToolsUpdateParamsSchema,
   CronJobSchema,
   CronListParamsSchema,
   CronStatusParamsSchema,
@@ -649,6 +712,19 @@ export {
   ExecApprovalGetParamsSchema,
   ExecApprovalRequestParamsSchema,
   ExecApprovalResolveParamsSchema,
+  ClawifyInstanceConfigSchema,
+  ClawifyUserConfigSchema,
+  ClawifyInstancesListParamsSchema,
+  ClawifyInstanceGetParamsSchema,
+  ClawifyInstanceUpsertParamsSchema,
+  ClawifyInstanceDeleteParamsSchema,
+  ClawifyUserGetParamsSchema,
+  ClawifyUserUpsertParamsSchema,
+  ClawifyUserDeleteParamsSchema,
+  ClawifyInstancesListResultSchema,
+  ClawifyInstanceGetResultSchema,
+  ClawifyUserGetResultSchema,
+  ClawifyMutationResultSchema,
   ChatHistoryParamsSchema,
   ChatSendParamsSchema,
   ChatInjectParamsSchema,
@@ -739,6 +815,20 @@ export type {
   SkillsDetailResult,
   SkillsInstallParams,
   SkillsUpdateParams,
+  ToolsUpdateParams,
+  ClawifyInstanceConfig,
+  ClawifyUserConfig,
+  ClawifyInstancesListParams,
+  ClawifyInstanceGetParams,
+  ClawifyInstanceUpsertParams,
+  ClawifyInstanceDeleteParams,
+  ClawifyUserGetParams,
+  ClawifyUserUpsertParams,
+  ClawifyUserDeleteParams,
+  ClawifyInstancesListResult,
+  ClawifyInstanceGetResult,
+  ClawifyUserGetResult,
+  ClawifyMutationResult,
   NodePairRejectParams,
   NodePairVerifyParams,
   NodeListParams,

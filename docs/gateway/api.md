@@ -102,6 +102,10 @@ Examples of managed domains include:
 - plugin and skill flows
 - host lifecycle actions (`install`, `start`, `stop`, `restart`, `uninstall`, `status`, `probe`)
 
+If you want a package-style app integration (`clawify.instance(...).user(...).prompt(...)`), see:
+
+- [/gateway/clawify-sdk](/gateway/clawify-sdk)
+
 ### Management event stream
 
 Use this for live updates in dashboards and control UIs:

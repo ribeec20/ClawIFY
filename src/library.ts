@@ -7,6 +7,7 @@ import { loadConfig } from "./config/config.js";
 import { resolveStorePath } from "./config/sessions/paths.js";
 import { deriveSessionKey, resolveSessionKey } from "./config/sessions/session-key.js";
 import { loadSessionStore, saveSessionStore } from "./config/sessions/store.js";
+import { clawify, createClawify } from "./gateway/clawify-sdk.js";
 import type { ensureBinary as ensureBinaryRuntime } from "./infra/binaries.js";
 import {
   describePortOwner,
@@ -75,6 +76,8 @@ export const monitorWebChannel: MonitorWebChannel = async (...args) =>
 
 export {
   applyTemplate,
+  clawify,
+  createClawify,
   createDefaultDeps,
   deriveSessionKey,
   describePortOwner,

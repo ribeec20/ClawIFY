@@ -229,6 +229,8 @@ export const SkillsUpdateParamsSchema = Type.Union([
       enabled: Type.Optional(Type.Boolean()),
       apiKey: Type.Optional(Type.String()),
       env: Type.Optional(Type.Record(NonEmptyString, Type.String())),
+      instanceId: Type.Optional(NonEmptyString),
+      userId: Type.Optional(NonEmptyString),
     },
     { additionalProperties: false },
   ),
@@ -346,6 +348,46 @@ export const ToolsEffectiveParamsSchema = Type.Object(
   {
     agentId: Type.Optional(NonEmptyString),
     sessionKey: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const ToolsUpdateParamsSchema = Type.Object(
+  {
+    allow: Type.Optional(Type.Array(NonEmptyString)),
+    alsoAllow: Type.Optional(Type.Array(NonEmptyString)),
+    deny: Type.Optional(Type.Array(NonEmptyString)),
+    profile: Type.Optional(
+      Type.Union([
+        Type.Literal("minimal"),
+        Type.Literal("coding"),
+        Type.Literal("messaging"),
+        Type.Literal("full"),
+      ]),
+    ),
+    byProvider: Type.Optional(
+      Type.Record(
+        NonEmptyString,
+        Type.Object(
+          {
+            allow: Type.Optional(Type.Array(NonEmptyString)),
+            alsoAllow: Type.Optional(Type.Array(NonEmptyString)),
+            deny: Type.Optional(Type.Array(NonEmptyString)),
+            profile: Type.Optional(
+              Type.Union([
+                Type.Literal("minimal"),
+                Type.Literal("coding"),
+                Type.Literal("messaging"),
+                Type.Literal("full"),
+              ]),
+            ),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    ),
+    instanceId: Type.Optional(NonEmptyString),
+    userId: Type.Optional(NonEmptyString),
   },
   { additionalProperties: false },
 );

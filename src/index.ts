@@ -4,6 +4,15 @@ import { fileURLToPath } from "node:url";
 import { formatUncaughtError } from "./infra/errors.js";
 import { isMainModule } from "./infra/is-main.js";
 import { installUnhandledRejectionHandler } from "./infra/unhandled-rejections.js";
+export type {
+  ClawifyClientOptions,
+  ClawifyPromptParams,
+  ClawifyPromptResult,
+  ClawifySessionCreateParams,
+  ClawifySessionSendParams,
+  ClawifySkillUpdate,
+  ClawifyToolsUpdate,
+} from "./gateway/clawify-sdk.js";
 
 type LegacyCliDeps = {
   installGaxiosFetchCompat: () => Promise<void>;
@@ -15,6 +24,8 @@ type LibraryExports = typeof import("./library.js");
 // These bindings are populated only for library consumers. The CLI entry stays
 // on the lean path and must not read them while running as main.
 export let applyTemplate: LibraryExports["applyTemplate"];
+export let clawify: LibraryExports["clawify"];
+export let createClawify: LibraryExports["createClawify"];
 export let createDefaultDeps: LibraryExports["createDefaultDeps"];
 export let deriveSessionKey: LibraryExports["deriveSessionKey"];
 export let describePortOwner: LibraryExports["describePortOwner"];
@@ -60,6 +71,8 @@ const isMain = isMainModule({
 if (!isMain) {
   ({
     applyTemplate,
+    clawify,
+    createClawify,
     createDefaultDeps,
     deriveSessionKey,
     describePortOwner,

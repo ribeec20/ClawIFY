@@ -1363,6 +1363,7 @@
                       "gateway/protocol",
                       "gateway/bridge-protocol",
                       "gateway/api",
+                      "gateway/clawify-sdk",
                       "gateway/openai-http-api",
                       "gateway/openresponses-http-api",
                       "gateway/tools-invoke-http-api",

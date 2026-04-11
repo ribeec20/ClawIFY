@@ -1,6 +1,6 @@
 {
-  "name": "clawify",
-  "version": "2026.4.10",
+  "name": "@ribeec20/clawify",
+  "version": "0.2.0",
   "description": "Multi-channel AI gateway with extensible messaging integrations",
   "keywords": [],
   "homepage": "https://github.com/openclaw/openclaw#readme",
@@ -43,6 +43,7 @@
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
+    "./sdk": "./dist/gateway/clawify-sdk.js",
     "./plugin-sdk": {
       "types": "./dist/plugin-sdk/index.d.ts",
       "default": "./dist/plugin-sdk/index.js"
@@ -1272,6 +1273,7 @@
     "test:live": "node scripts/test-live.mjs",
     "test:live:cache": "bun scripts/check-live-cache.ts",
     "test:live:gateway-profiles": "node scripts/test-live.mjs -- src/gateway/gateway-models.profiles.live.test.ts",
+    "test:live:management:api": "node scripts/run-management-live-api-test.mjs",
     "test:live:media": "node --import tsx scripts/test-live-media.ts",
     "test:live:media:image": "node --import tsx scripts/test-live-media.ts image",
     "test:live:media:music": "node --import tsx scripts/test-live-media.ts music",
