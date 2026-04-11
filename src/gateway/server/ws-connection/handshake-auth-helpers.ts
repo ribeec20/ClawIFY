@@ -19,6 +19,7 @@ export const BROWSER_ORIGIN_RATE_LIMIT_KEY_PREFIX = "browser-origin:";
 export type PairingLocalityKind =
   | "direct_local"
   | "cli_container_local"
+  | "backend_container_local"
   | "browser_container_local"
   | "remote";
 
@@ -111,6 +112,30 @@ function isCliContainerLocalEquivalent(params: {
   );
 }
 
+function isBackendContainerLocalEquivalent(params: {
+  connectParams: ConnectParams;
+  requestHost?: string;
+  remoteAddress?: string;
+  hasProxyHeaders: boolean;
+  hasBrowserOriginHeader: boolean;
+  sharedAuthOk: boolean;
+  authMethod: GatewayAuthResult["method"];
+}): boolean {
+  const isBackendClient =
+    params.connectParams.client.id === GATEWAY_CLIENT_IDS.GATEWAY_CLIENT &&
+    params.connectParams.client.mode === GATEWAY_CLIENT_MODES.BACKEND;
+  const usesSharedSecretAuth = params.authMethod === "token" || params.authMethod === "password";
+  return (
+    isBackendClient &&
+    params.sharedAuthOk &&
+    usesSharedSecretAuth &&
+    !params.hasProxyHeaders &&
+    !params.hasBrowserOriginHeader &&
+    isPrivateOrLoopbackAddress(params.remoteAddress) &&
+    isPrivateOrLoopbackHost(resolveHostName(params.requestHost))
+  );
+}
+
 function resolveOriginHost(origin?: string): string {
   const trimmed = origin?.trim();
   if (!trimmed) {
@@ -190,6 +215,19 @@ export function resolvePairingLocality(params: {
   ) {
     return "cli_container_local";
   }
+  if (
+    isBackendContainerLocalEquivalent({
+      connectParams: params.connectParams,
+      requestHost: params.requestHost,
+      remoteAddress: params.remoteAddress,
+      hasProxyHeaders: params.hasProxyHeaders,
+      hasBrowserOriginHeader: params.hasBrowserOriginHeader,
+      sharedAuthOk: params.sharedAuthOk,
+      authMethod: params.authMethod,
+    })
+  ) {
+    return "backend_container_local";
+  }
   return "remote";
 }
 
@@ -208,10 +246,13 @@ export function shouldSkipLocalBackendSelfPairing(params: {
   }
   const usesSharedSecretAuth = params.authMethod === "token" || params.authMethod === "password";
   const usesDeviceTokenAuth = params.authMethod === "device-token";
+  const localBackendLocality =
+    params.locality === "direct_local" || params.locality === "backend_container_local";
   return (
-    params.locality === "direct_local" &&
+    localBackendLocality &&
     !params.hasBrowserOriginHeader &&
-    ((params.sharedAuthOk && usesSharedSecretAuth) || usesDeviceTokenAuth)
+    ((params.sharedAuthOk && usesSharedSecretAuth) ||
+      (params.locality === "direct_local" && usesDeviceTokenAuth))
   );
 }
 

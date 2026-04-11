@@ -34,6 +34,7 @@ import { getDeterministicFreePortBlock } from "../test-utils/ports.js";
 import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { buildDeviceAuthPayloadV3 } from "./device-auth.js";
 import { PROTOCOL_VERSION } from "./protocol/index.js";
+import type { GatewayServer } from "./server.js";
 import type { GatewayServerOptions } from "./server.js";
 import { resetTestPluginRegistry } from "./test-helpers.plugin-registry.js";
 import {
@@ -84,7 +85,55 @@ let suiteConfigRootSeq = 0;
 let lastSyncedSessionStorePath: string | undefined;
 let lastSyncedSessionConfigJson: string | undefined;
 let activeSuiteGatewayServerCount = 0;
+const activeSuiteGatewayServers = new Set<GatewayServer>();
 let activeSuiteHookScopeCount = 0;
+
+async function closeLeakedGatewayServers(timeoutMs = 10_000): Promise<void> {
+  const leaked = [...activeSuiteGatewayServers];
+  for (const server of leaked) {
+    try {
+      await Promise.race([
+        server.close({ reason: "test cleanup" }),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error("timeout closing leaked gateway server"));
+          }, timeoutMs);
+        }),
+      ]);
+    } catch {
+      // Best effort: if close hangs, continue cleanup to avoid hook deadlock.
+    } finally {
+      activeSuiteGatewayServers.delete(server);
+    }
+  }
+  activeSuiteGatewayServerCount = activeSuiteGatewayServers.size;
+}
+
+async function awaitWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | undefined> {
+  return await Promise.race([
+    promise,
+    new Promise<undefined>((resolve) => {
+      setTimeout(() => {
+        resolve(undefined);
+      }, timeoutMs);
+    }),
+  ]);
+}
+
+async function rmPathBestEffort(targetPath: string | undefined, timeoutMs = 15_000): Promise<void> {
+  if (!targetPath) {
+    return;
+  }
+  await awaitWithTimeout(
+    fs.rm(targetPath, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 25,
+    }),
+    timeoutMs,
+  );
+}
 
 function resolveGatewayTestMainSessionKeys(): string[] {
   const resolved = resolveMainSessionKeyFromConfig();
@@ -251,43 +300,23 @@ async function resetGatewayTestState(options: { uniqueConfigRoot: boolean }) {
   delete process.env.OPENCLAW_GATEWAY_TOKEN;
   const stateDir = process.env.OPENCLAW_STATE_DIR;
   if (stateDir) {
-    await fs.rm(stateDir, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 25,
-    });
+    await rmPathBestEffort(stateDir);
     await fs.mkdir(stateDir, { recursive: true });
   }
   if (options.uniqueConfigRoot) {
     const suiteRoot = path.join(tempHome, ".openclaw-test-suite");
     await fs.mkdir(suiteRoot, { recursive: true });
     tempConfigRoot = path.join(suiteRoot, `case-${suiteConfigRootSeq++}`);
-    await fs.rm(tempConfigRoot, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 25,
-    });
+    await rmPathBestEffort(tempConfigRoot);
     await fs.mkdir(tempConfigRoot, { recursive: true });
   } else {
     tempConfigRoot = path.join(tempHome, ".openclaw-test");
-    await fs.rm(tempConfigRoot, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 25,
-    });
+    await rmPathBestEffort(tempConfigRoot);
     await fs.mkdir(tempConfigRoot, { recursive: true });
   }
   setTestConfigRoot(tempConfigRoot);
   tempControlUiRoot = path.join(tempHome, ".openclaw-test-control-ui");
-  await fs.rm(tempControlUiRoot, {
-    recursive: true,
-    force: true,
-    maxRetries: 20,
-    retryDelay: 25,
-  });
+  await rmPathBestEffort(tempControlUiRoot);
   await fs.mkdir(tempControlUiRoot, { recursive: true });
   await fs.writeFile(
     path.join(tempControlUiRoot, "index.html"),
@@ -358,6 +387,7 @@ async function resetGatewayTestState(options: { uniqueConfigRoot: boolean }) {
 
 async function cleanupGatewayTestHome(options: { restoreEnv: boolean }) {
   vi.useRealTimers();
+  await closeLeakedGatewayServers();
   clearGatewaySubagentRuntime();
   resetLogger();
   if (options.restoreEnv) {
@@ -365,12 +395,7 @@ async function cleanupGatewayTestHome(options: { restoreEnv: boolean }) {
     gatewayEnvSnapshot = undefined;
   }
   if (options.restoreEnv && tempHome) {
-    await fs.rm(tempHome, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 25,
-    });
+    await rmPathBestEffort(tempHome);
     tempHome = undefined;
   }
   tempConfigRoot = undefined;
@@ -592,6 +617,7 @@ export async function startGatewayServer(port: number, opts?: GatewayServerOptio
   }
   const server = await mod.startGatewayServer(port, resolvedOpts);
   activeSuiteGatewayServerCount += 1;
+  activeSuiteGatewayServers.add(server);
   const originalClose = server.close.bind(server);
   let closed = false;
   server.close = (async (...args: Parameters<typeof originalClose>) => {
@@ -601,6 +627,7 @@ export async function startGatewayServer(port: number, opts?: GatewayServerOptio
       if (!closed) {
         closed = true;
         activeSuiteGatewayServerCount = Math.max(0, activeSuiteGatewayServerCount - 1);
+        activeSuiteGatewayServers.delete(server);
       }
     }
   }) as typeof server.close;

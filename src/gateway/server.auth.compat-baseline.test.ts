@@ -213,6 +213,33 @@ describe("gateway auth compatibility baseline", () => {
         ws.close();
       }
     });
+
+    test("keeps local backend shared-token first connects out of pairing", async () => {
+      const identityPath = path.join(
+        os.tmpdir(),
+        `openclaw-backend-shared-token-${process.pid}-${port}.json`,
+      );
+      const { listDevicePairing } = await import("../infra/device-pairing.js");
+      const { loadOrCreateDeviceIdentity } = await import("../infra/device-identity.js");
+      const identity = loadOrCreateDeviceIdentity(identityPath);
+
+      const ws = await openWs(port);
+      try {
+        const res = await connectReq(ws, {
+          token: "secret",
+          client: { ...BACKEND_GATEWAY_CLIENT },
+          deviceIdentityPath: identityPath,
+          scopes: ["operator.admin"],
+        });
+        expect(res.ok).toBe(true);
+
+        const pairing = await listDevicePairing();
+        const pendingForDevice = pairing.pending.find((entry) => entry.deviceId === identity.deviceId);
+        expect(pendingForDevice).toBeUndefined();
+      } finally {
+        ws.close();
+      }
+    });
   });
 
   describe("password mode", () => {

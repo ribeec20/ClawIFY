@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
 import { getTotalPendingReplies } from "../auto-reply/reply/dispatcher-registry.js";
 import type { CanvasHostServer } from "../canvas-host/server.js";
@@ -47,7 +48,8 @@ import { buildGatewayCronService } from "./server-cron.js";
 import { applyGatewayLaneConcurrency } from "./server-lanes.js";
 import { createGatewayServerLiveState, type GatewayServerLiveState } from "./server-live-state.js";
 import { GATEWAY_EVENTS } from "./server-methods-list.js";
-import { coreGatewayHandlers } from "./server-methods.js";
+import { coreGatewayHandlers, handleGatewayRequest } from "./server-methods.js";
+import type { GatewayClient, GatewayRequestContext } from "./server-methods/types.js";
 import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 import { createGatewayNodeSessionRuntime } from "./server-node-session-runtime.js";
 import { reloadDeferredGatewayPlugins } from "./server-plugin-bootstrap.js";
@@ -85,6 +87,8 @@ import { createReadinessChecker } from "./server/readiness.js";
 import { loadGatewayTlsRuntime } from "./server/tls.js";
 import { resolveSharedGatewaySessionGeneration } from "./server/ws-shared-generation.js";
 import { maybeSeedControlUiAllowedOriginsAtStartup } from "./startup-control-ui-origins.js";
+import type { GatewayManagementMethodInvoker } from "./management-http.js";
+import { createHostManagerLifecycleAdapter } from "./management-host.js";
 
 export { __resetModelCatalogCacheForTest } from "./server-model-catalog.js";
 
@@ -99,6 +103,19 @@ function resolveMediaCleanupTtlMs(ttlHoursRaw: number): number {
     throw new Error(`Invalid media.ttlHours: ${String(ttlHoursRaw)}`);
   }
   return ttlMs;
+}
+
+function normalizeOptionalLowercaseEnvString(value: string | undefined): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed.toLowerCase() : undefined;
+}
+
+function parseBooleanEnvFlag(value: string | undefined): boolean {
+  const normalized = normalizeOptionalLowercaseEnvString(value);
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
 const log = createSubsystemLogger("gateway");
@@ -179,6 +196,11 @@ export type GatewayServerOptions = {
    * Default: config `gateway.http.endpoints.responses.enabled` (or false when absent).
    */
   openResponsesEnabled?: boolean;
+  /**
+   * If true, enable the management HTTP facade (`/v1/management/*`).
+   * Default: disabled unless OPENCLAW_GATEWAY_MANAGEMENT_API/OPENCLAW_MANAGEMENT_API is truthy.
+   */
+  managementApiEnabled?: boolean;
   /**
    * Override gateway auth configuration (merges with config).
    */
@@ -345,6 +367,10 @@ export async function startGatewayServer(
     tailscaleConfig,
     tailscaleMode,
   } = runtimeConfig;
+  const managementApiEnabled =
+    opts.managementApiEnabled ??
+    (parseBooleanEnvFlag(process.env.OPENCLAW_GATEWAY_MANAGEMENT_API) ||
+      parseBooleanEnvFlag(process.env.OPENCLAW_MANAGEMENT_API));
   const getResolvedAuth = () =>
     resolveGatewayAuth({
       authConfig:
@@ -398,6 +424,68 @@ export async function startGatewayServer(
 
   const deps = createDefaultDeps();
   let runtimeState: GatewayServerLiveState | null = null;
+  const hostLifecycle = createHostManagerLifecycleAdapter();
+  let managementGatewayContext: GatewayRequestContext | null = null;
+  const invokeGatewayManagementMethod: GatewayManagementMethodInvoker = async ({
+    method,
+    params,
+    scopes,
+    req,
+  }) => {
+    const context = managementGatewayContext;
+    if (!context) {
+      return {
+        ok: false,
+        error: {
+          code: "UNAVAILABLE",
+          message: "management request context unavailable",
+        },
+      };
+    }
+
+    return await new Promise((resolve) => {
+      const requestFrame = {
+        type: "req",
+        id: `management:${randomUUID()}`,
+        method,
+        params: params ?? {},
+      } as const;
+      const client: GatewayClient = {
+        connId: `management-http:${req.socket.remoteAddress ?? "local"}`,
+        connect: {
+          role: "operator",
+          scopes,
+        } as GatewayClient["connect"],
+      };
+      const respond = (
+        ok: boolean,
+        payload?: unknown,
+        error?: {
+          code?: string;
+          message?: string;
+          details?: unknown;
+        },
+      ) => {
+        resolve({ ok, payload, error });
+      };
+      void handleGatewayRequest({
+        req: requestFrame,
+        respond,
+        client,
+        isWebchatConnect: () => false,
+        extraHandlers: pluginRegistry.gatewayHandlers,
+        context,
+      }).catch((error) => {
+        resolve({
+          ok: false,
+          error: {
+            code: "UNAVAILABLE",
+            message: String(error),
+          },
+        });
+      });
+    });
+  };
   let canvasHostServer: CanvasHostServer | null = null;
   const gatewayTls = await loadGatewayTlsRuntime(cfgAtStart.gateway?.tls, log.child("tls"));
   if (cfgAtStart.gateway?.tls?.enabled && !gatewayTls.enabled) {
@@ -452,6 +540,12 @@ export async function startGatewayServer(
     openResponsesEnabled,
     openResponsesConfig,
     strictTransportSecurityHeader,
+    managementApi: managementApiEnabled
+      ? {
+          invokeGatewayMethod: invokeGatewayManagementMethod,
+          hostLifecycle,
+        }
+      : undefined,
     resolvedAuth,
     rateLimiter: authRateLimiter,
     gatewayTls,
@@ -695,6 +789,7 @@ export async function startGatewayServer(
       broadcastVoiceWakeChanged,
       unavailableGatewayMethods,
     });
+    managementGatewayContext = gatewayRequestContext;
 
     setFallbackGatewayContextResolver(() => gatewayRequestContext);
 

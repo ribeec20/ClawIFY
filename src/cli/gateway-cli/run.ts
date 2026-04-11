@@ -47,7 +47,7 @@ import {
   toOptionString,
 } from "./shared.js";
 
-type GatewayRunOpts = {
+export type GatewayRunOpts = {
   port?: unknown;
   profile?: unknown;
   bind?: unknown;
@@ -250,7 +250,7 @@ function isHealthyGatewayLockError(err: unknown): boolean {
   );
 }
 
-async function runGatewayCommand(opts: GatewayRunOpts) {
+export async function runGatewayCommand(opts: GatewayRunOpts) {
   const isDevProfile = normalizeOptionalLowercaseString(process.env.OPENCLAW_PROFILE) === "dev";
   const devMode = Boolean(opts.dev) || isDevProfile;
   if (opts.reset && !devMode) {

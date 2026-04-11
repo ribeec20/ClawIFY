@@ -64,6 +64,11 @@ import {
   resolveHttpBrowserOriginPolicy,
 } from "./http-utils.js";
 import { handleOpenAiModelsHttpRequest } from "./models-http.js";
+import {
+  handleManagementHttpRequest,
+  type GatewayManagementMethodInvoker,
+} from "./management-http.js";
+import type { HostManagerLifecycleAdapter } from "./management-host.js";
 import { resolveRequestClientIp } from "./net.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
@@ -753,6 +758,10 @@ export function createGatewayHttpServer(opts: {
   openResponsesEnabled: boolean;
   openResponsesConfig?: import("../config/types.gateway.js").GatewayHttpResponsesConfig;
   strictTransportSecurityHeader?: string;
+  managementApi?: {
+    invokeGatewayMethod: GatewayManagementMethodInvoker;
+    hostLifecycle: HostManagerLifecycleAdapter;
+  };
   handleHooksRequest: HooksRequestHandler;
   handlePluginRequest?: PluginHttpRequestHandler;
   shouldEnforcePluginGatewayAuth?: (pathContext: PluginRoutePathContext) => boolean;
@@ -773,6 +782,7 @@ export function createGatewayHttpServer(opts: {
     openResponsesEnabled,
     openResponsesConfig,
     strictTransportSecurityHeader,
+    managementApi,
     handleHooksRequest,
     handlePluginRequest,
     shouldEnforcePluginGatewayAuth,
@@ -820,6 +830,20 @@ export function createGatewayHttpServer(opts: {
         {
           name: "hooks",
           run: () => handleHooksRequest(req, res),
+        },
+        {
+          name: "management",
+          run: () =>
+            managementApi
+              ? handleManagementHttpRequest(req, res, {
+                  auth: resolvedAuth,
+                  trustedProxies,
+                  allowRealIpFallback,
+                  rateLimiter,
+                  invokeGatewayMethod: managementApi.invokeGatewayMethod,
+                  hostLifecycle: managementApi.hostLifecycle,
+                })
+              : false,
         },
         {
           name: "models",

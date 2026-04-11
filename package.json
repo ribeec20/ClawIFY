@@ -1,5 +1,5 @@
 {
-  "name": "openclaw",
+  "name": "clawify",
   "version": "2026.4.10",
   "description": "Multi-channel AI gateway with extensible messaging integrations",
   "keywords": [],
@@ -14,7 +14,8 @@
     "url": "git+https://github.com/openclaw/openclaw.git"
   },
   "bin": {
-    "openclaw": "openclaw.mjs"
+    "openclaw": "openclaw.mjs",
+    "clawify": "clawify.mjs"
   },
   "directories": {
     "doc": "docs",
@@ -23,6 +24,7 @@
   "files": [
     "CHANGELOG.md",
     "LICENSE",
+    "clawify.mjs",
     "openclaw.mjs",
     "README.md",
     "assets/",

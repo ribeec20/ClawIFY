@@ -10,6 +10,11 @@ const subCliCommandCatalog = defineCommandDescriptorCatalog([
     description: "Run, inspect, and query the WebSocket Gateway",
     hasSubcommands: true,
   },
+  {
+    name: "serve",
+    description: "Run OpenClaw in headless API mode (Gateway + management API)",
+    hasSubcommands: false,
+  },
   { name: "daemon", description: "Gateway service (legacy alias)", hasSubcommands: true },
   { name: "logs", description: "Tail gateway file logs via RPC", hasSubcommands: false },
   {

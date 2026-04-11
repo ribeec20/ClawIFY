@@ -18,6 +18,8 @@ import type { ResolvedGatewayAuth } from "./auth.js";
 import type { ChatAbortControllerEntry } from "./chat-abort.js";
 import type { ControlUiRootState } from "./control-ui.js";
 import type { HooksConfigResolved } from "./hooks.js";
+import type { GatewayManagementMethodInvoker } from "./management-http.js";
+import type { HostManagerLifecycleAdapter } from "./management-host.js";
 import { isLoopbackHost, resolveGatewayListenHosts } from "./net.js";
 import {
   createGatewayBroadcaster,
@@ -63,6 +65,10 @@ export async function createGatewayRuntimeState(params: {
   openResponsesEnabled: boolean;
   openResponsesConfig?: import("../config/types.gateway.js").GatewayHttpResponsesConfig;
   strictTransportSecurityHeader?: string;
+  managementApi?: {
+    invokeGatewayMethod: GatewayManagementMethodInvoker;
+    hostLifecycle: HostManagerLifecycleAdapter;
+  };
   resolvedAuth: ResolvedGatewayAuth;
   /** Optional rate limiter for auth brute-force protection. */
   rateLimiter?: AuthRateLimiter;
@@ -184,6 +190,7 @@ export async function createGatewayRuntimeState(params: {
         openResponsesEnabled: params.openResponsesEnabled,
         openResponsesConfig: params.openResponsesConfig,
         strictTransportSecurityHeader: params.strictTransportSecurityHeader,
+        managementApi: params.managementApi,
         handleHooksRequest,
         handlePluginRequest,
         shouldEnforcePluginGatewayAuth,

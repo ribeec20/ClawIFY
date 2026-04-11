@@ -325,8 +325,8 @@ describe("handshake auth helpers", () => {
   it("keeps non-CLI clients remote when only the Docker CLI fallback conditions match", () => {
     const connectParams = {
       client: {
-        id: GATEWAY_CLIENT_IDS.GATEWAY_CLIENT,
-        mode: GATEWAY_CLIENT_MODES.BACKEND,
+        id: GATEWAY_CLIENT_IDS.TEST,
+        mode: GATEWAY_CLIENT_MODES.TEST,
       },
     } as ConnectParams;
     expect(
@@ -337,6 +337,87 @@ describe("handshake auth helpers", () => {
         remoteAddress: "127.0.0.1",
         hasProxyHeaders: false,
         hasBrowserOriginHeader: false,
+        sharedAuthOk: true,
+        authMethod: "token",
+      }),
+    ).toBe("remote");
+  });
+
+  it("classifies backend private-host connects as backend_container_local only with shared auth", () => {
+    const connectParams = {
+      client: {
+        id: GATEWAY_CLIENT_IDS.GATEWAY_CLIENT,
+        mode: GATEWAY_CLIENT_MODES.BACKEND,
+      },
+    } as ConnectParams;
+    expect(
+      resolvePairingLocality({
+        connectParams,
+        isLocalClient: false,
+        requestHost: "172.17.0.2:18789",
+        remoteAddress: "172.17.0.1",
+        hasProxyHeaders: false,
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: true,
+        authMethod: "token",
+      }),
+    ).toBe("backend_container_local");
+    expect(
+      resolvePairingLocality({
+        connectParams,
+        isLocalClient: false,
+        requestHost: "172.17.0.2:18789",
+        remoteAddress: "172.17.0.1",
+        hasProxyHeaders: false,
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: true,
+        authMethod: "password",
+      }),
+    ).toBe("backend_container_local");
+    expect(
+      resolvePairingLocality({
+        connectParams,
+        isLocalClient: false,
+        requestHost: "172.17.0.2:18789",
+        remoteAddress: "172.17.0.1",
+        hasProxyHeaders: false,
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: false,
+        authMethod: "token",
+      }),
+    ).toBe("remote");
+    expect(
+      resolvePairingLocality({
+        connectParams,
+        isLocalClient: false,
+        requestHost: "gateway.example",
+        remoteAddress: "172.17.0.1",
+        hasProxyHeaders: false,
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: true,
+        authMethod: "token",
+      }),
+    ).toBe("remote");
+    expect(
+      resolvePairingLocality({
+        connectParams,
+        isLocalClient: false,
+        requestHost: "172.17.0.2:18789",
+        remoteAddress: "172.17.0.1",
+        hasProxyHeaders: true,
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: true,
+        authMethod: "token",
+      }),
+    ).toBe("remote");
+    expect(
+      resolvePairingLocality({
+        connectParams,
+        isLocalClient: false,
+        requestHost: "172.17.0.2:18789",
+        remoteAddress: "172.17.0.1",
+        hasProxyHeaders: false,
+        hasBrowserOriginHeader: true,
         sharedAuthOk: true,
         authMethod: "token",
       }),
@@ -380,6 +461,33 @@ describe("handshake auth helpers", () => {
     expect(
       shouldSkipLocalBackendSelfPairing({
         connectParams,
+        locality: "backend_container_local",
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: true,
+        authMethod: "token",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipLocalBackendSelfPairing({
+        connectParams,
+        locality: "backend_container_local",
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: true,
+        authMethod: "password",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipLocalBackendSelfPairing({
+        connectParams,
+        locality: "backend_container_local",
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: false,
+        authMethod: "token",
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipLocalBackendSelfPairing({
+        connectParams,
         locality: "direct_local",
         hasBrowserOriginHeader: false,
         sharedAuthOk: false,
@@ -390,6 +498,15 @@ describe("handshake auth helpers", () => {
       shouldSkipLocalBackendSelfPairing({
         connectParams,
         locality: "remote",
+        hasBrowserOriginHeader: false,
+        sharedAuthOk: false,
+        authMethod: "device-token",
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipLocalBackendSelfPairing({
+        connectParams,
+        locality: "backend_container_local",
         hasBrowserOriginHeader: false,
         sharedAuthOk: false,
         authMethod: "device-token",
