@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolvePnpmRunner } from "./pnpm-runner.mjs";
 
 const nodeBin = process.execPath;
 const WINDOWS_BUILD_MAX_OLD_SPACE_MB = 4096;
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const a2uiRendererDir = path.join(rootDir, "vendor", "a2ui", "renderers", "lit");
+const a2uiAppDir = path.join(rootDir, "apps", "shared", "OpenClawKit", "Tools", "CanvasA2UI");
+const a2uiBundleFile = path.join(rootDir, "src", "canvas-host", "a2ui", "a2ui.bundle.js");
 export const BUILD_ALL_STEPS = [
   { label: "canvas:a2ui:bundle", kind: "pnpm", pnpmArgs: ["canvas:a2ui:bundle"] },
   { label: "tsdown", kind: "node", args: ["scripts/tsdown-build.mjs"] },
@@ -58,6 +64,29 @@ export const BUILD_ALL_STEPS = [
     args: ["--import", "tsx", "scripts/write-cli-compat.ts"],
   },
 ];
+
+function shouldSkipMissingA2ui(env) {
+  if (env.OPENCLAW_A2UI_SKIP_MISSING === "1" || env.OPENCLAW_SPARSE_PROFILE) {
+    return true;
+  }
+  const isCi = /^(1|true)$/i.test(env.CI ?? "");
+  if (isCi) {
+    return false;
+  }
+  const hasSources = existsSync(a2uiRendererDir) && existsSync(a2uiAppDir);
+  const hasBundle = existsSync(a2uiBundleFile);
+  return !hasSources && !hasBundle;
+}
+
+function resolveBuildAllEnv(env = process.env) {
+  if (!shouldSkipMissingA2ui(env)) {
+    return env;
+  }
+  return {
+    ...env,
+    OPENCLAW_A2UI_SKIP_MISSING: "1",
+  };
+}
 
 function resolveStepEnv(step, env, platform) {
   if (platform !== "win32" || !step.windowsNodeOptions) {
@@ -116,9 +145,10 @@ function isMainModule() {
 }
 
 if (isMainModule()) {
+  const buildEnv = resolveBuildAllEnv(process.env);
   for (const step of BUILD_ALL_STEPS) {
     console.error(`[build-all] ${step.label}`);
-    const invocation = resolveBuildAllStep(step);
+    const invocation = resolveBuildAllStep(step, { env: buildEnv });
     const result = spawnSync(invocation.command, invocation.args, invocation.options);
     if (typeof result.status === "number") {
       if (result.status !== 0) {

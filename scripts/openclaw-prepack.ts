@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { formatErrorMessage } from "../src/infra/errors.ts";
+import { resolvePnpmRunner } from "./pnpm-runner.mjs";
 
 const skipPrepackPreparedEnv = "OPENCLAW_PREPACK_PREPARED";
 const requiredPreparedPathGroups = [
@@ -101,30 +102,72 @@ function ensurePreparedArtifacts(): void {
   process.exit(1);
 }
 
-function run(command: string, args: string[]): void {
+function createPrepackChildEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    npm_config_dry_run: "false",
+    NPM_CONFIG_DRY_RUN: "false",
+  };
+}
+
+function run(
+  command: string,
+  args: string[],
+  options: {
+    env?: NodeJS.ProcessEnv;
+    shell?: boolean;
+    windowsVerbatimArguments?: boolean;
+  } = {},
+): void {
   const result = spawnSync(command, args, {
     stdio: "inherit",
-    env: process.env,
+    env: options.env ?? process.env,
+    ...options,
   });
   if (result.status === 0) {
     return;
   }
+  if (result.error) {
+    console.error(`prepack: failed to run ${command}: ${formatErrorMessage(result.error)}`);
+  }
   process.exit(result.status ?? 1);
 }
 
+function runPnpm(pnpmArgs: string[]): void {
+  const env = createPrepackChildEnv(process.env);
+  const runner = resolvePnpmRunner({
+    pnpmArgs,
+    nodeExecPath: process.execPath,
+    npmExecPath: env.npm_execpath,
+    comSpec: env.ComSpec,
+    platform: process.platform,
+  });
+  run(runner.command, runner.args, {
+    env,
+    shell: runner.shell,
+    windowsVerbatimArguments: runner.windowsVerbatimArguments,
+  });
+}
+
 function runBuildSmoke(): void {
-  run(process.execPath, ["scripts/test-built-bundled-channel-entry-smoke.mjs"]);
+  run(process.execPath, ["scripts/test-built-bundled-channel-entry-smoke.mjs"], {
+    env: createPrepackChildEnv(process.env),
+  });
 }
 
 function main(): void {
-  const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  const hasUiWorkspace = existsSync("ui/package.json");
   if (shouldSkipPrepack()) {
     ensurePreparedArtifacts();
     runBuildSmoke();
     return;
   }
-  run(pnpmCommand, ["build"]);
-  run(pnpmCommand, ["ui:build"]);
+  runPnpm(["build"]);
+  if (hasUiWorkspace) {
+    runPnpm(["ui:build"]);
+  } else {
+    console.error("prepack: UI workspace not found; skipping ui:build.");
+  }
   runBuildSmoke();
 }
 

@@ -267,12 +267,18 @@ function installPluginRuntimeDeps(params) {
       "--package-lock=false",
     ],
   });
+  const npmInstallEnv = {
+    ...(npmRunner.env ?? process.env),
+    // Runtime dependency staging must materialize real node_modules even when the parent command is a dry-run pack.
+    npm_config_dry_run: "false",
+    NPM_CONFIG_DRY_RUN: "false",
+  };
   try {
     writeJson(path.join(tempInstallDir, "package.json"), packageJson);
     const result = spawnSync(npmRunner.command, npmRunner.args, {
       cwd: tempInstallDir,
       encoding: "utf8",
-      env: npmRunner.env,
+      env: npmInstallEnv,
       stdio: "pipe",
       shell: npmRunner.shell,
       windowsVerbatimArguments: npmRunner.windowsVerbatimArguments,
