@@ -49,7 +49,6 @@ import { createSharedCoreVitestConfig } from "../vitest.shared-core.config.ts";
 import { createTasksVitestConfig } from "../vitest.tasks.config.ts";
 import { createToolingVitestConfig } from "../vitest.tooling.config.ts";
 import { createTuiVitestConfig } from "../vitest.tui.config.ts";
-import { createUiVitestConfig } from "../vitest.ui.config.ts";
 import { bundledPluginDependentUnitTestFiles } from "../vitest.unit-paths.mjs";
 import { createUtilsVitestConfig } from "../vitest.utils.config.ts";
 import { createWizardVitestConfig } from "../vitest.wizard.config.ts";
@@ -208,7 +207,6 @@ describe("scoped vitest configs", () => {
   const defaultProcessConfig = createProcessVitestConfig({});
   const defaultToolingConfig = createToolingVitestConfig({});
   const defaultTuiConfig = createTuiVitestConfig({});
-  const defaultUiConfig = createUiVitestConfig({});
   const defaultUtilsConfig = createUtilsVitestConfig({});
   const defaultWizardConfig = createWizardVitestConfig({});
 
@@ -236,10 +234,6 @@ describe("scoped vitest configs", () => {
       expect(config.test?.isolate).toBe(false);
       expect(config.test?.runner).toBe("./test/non-isolated-runner.ts");
     }
-
-    expect(defaultUiConfig.test?.pool).toBe("threads");
-    expect(defaultUiConfig.test?.isolate).toBe(true);
-    expect(defaultUiConfig.test?.runner).toBeUndefined();
   });
 
   it("keeps the process lane off the openclaw runtime setup", () => {
@@ -662,11 +656,6 @@ describe("scoped vitest configs", () => {
     expect(defaultPluginsConfig.test?.dir).toBe("src/plugins");
     expect(defaultPluginsConfig.test?.include).toEqual(["**/*.test.ts"]);
     expect(defaultPluginsConfig.test?.exclude).toContain("contracts/**");
-  });
-
-  it("normalizes ui include patterns relative to the scoped dir", () => {
-    expect(defaultUiConfig.test?.dir).toBe("ui/src/ui");
-    expect(defaultUiConfig.test?.include).toEqual(["**/*.test.ts"]);
   });
 
   it("normalizes utils include patterns relative to the scoped dir", () => {

@@ -7,7 +7,6 @@ import baseConfig, { rootVitestProjects } from "../vitest.config.ts";
 import { createContractsVitestConfig } from "../vitest.contracts.config.ts";
 import { createGatewayVitestConfig } from "../vitest.gateway.config.ts";
 import { createPluginSdkLightVitestConfig } from "../vitest.plugin-sdk-light.config.ts";
-import { createUiVitestConfig } from "../vitest.ui.config.ts";
 import { createUnitFastVitestConfig } from "../vitest.unit-fast.config.ts";
 import { createUnitVitestConfig } from "../vitest.unit.config.ts";
 
@@ -30,16 +29,6 @@ describe("projects vitest config", () => {
     const config = createContractsVitestConfig();
     expect(config.test.isolate).toBe(false);
     expect(config.test.runner).toBe("./test/non-isolated-runner.ts");
-  });
-
-  it("keeps the root ui lane aligned with the isolated jsdom setup", () => {
-    const config = createUiVitestConfig();
-    expect(config.test.environment).toBe("jsdom");
-    expect(config.test.isolate).toBe(true);
-    expect(config.test.runner).toBeUndefined();
-    expect(config.test.setupFiles).not.toContain("test/setup-openclaw-runtime.ts");
-    expect(config.test.setupFiles).toContain("ui/src/test-helpers/lit-warnings.setup.ts");
-    expect(config.test.deps?.optimizer?.web?.enabled).toBe(true);
   });
 
   it("keeps the unit lane on the non-isolated runner by default", () => {

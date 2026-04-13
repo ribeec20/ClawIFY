@@ -80,7 +80,6 @@ const SHARED_CORE_VITEST_CONFIG = "vitest.shared-core.config.ts";
 const TASKS_VITEST_CONFIG = "vitest.tasks.config.ts";
 const TOOLING_VITEST_CONFIG = "vitest.tooling.config.ts";
 const TUI_VITEST_CONFIG = "vitest.tui.config.ts";
-const UI_VITEST_CONFIG = "vitest.ui.config.ts";
 const UTILS_VITEST_CONFIG = "vitest.utils.config.ts";
 const WIZARD_VITEST_CONFIG = "vitest.wizard.config.ts";
 const INCLUDE_FILE_ENV_KEY = "OPENCLAW_VITEST_INCLUDE_FILE";
@@ -133,7 +132,6 @@ const VITEST_CONFIG_BY_KIND = {
   tasks: TASKS_VITEST_CONFIG,
   tooling: TOOLING_VITEST_CONFIG,
   tui: TUI_VITEST_CONFIG,
-  ui: UI_VITEST_CONFIG,
   utils: UTILS_VITEST_CONFIG,
   wizard: WIZARD_VITEST_CONFIG,
 };
@@ -254,7 +252,7 @@ function shouldKeepBroadChangedRun(changedPaths) {
 }
 
 function isRoutableChangedTarget(changedPath) {
-  return /^(?:src|test|extensions|ui|packages|apps)(?:\/|$)/u.test(changedPath);
+  return /^(?:src|test|extensions|packages|apps)(?:\/|$)/u.test(changedPath);
 }
 
 export function resolveChangedTargetArgs(
@@ -427,9 +425,6 @@ function classifyTarget(arg, cwd) {
   if (relative.startsWith("src/plugins/")) {
     return "plugin";
   }
-  if (relative.startsWith("ui/src/ui/")) {
-    return "ui";
-  }
   if (relative.startsWith("src/utils/")) {
     return "utils";
   }
@@ -557,7 +552,6 @@ export function buildVitestRunPlans(
     "autoReply",
     "agent",
     "plugin",
-    "ui",
     "utils",
     "wizard",
     "e2e",

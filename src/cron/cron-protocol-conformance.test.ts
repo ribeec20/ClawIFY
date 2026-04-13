@@ -39,8 +39,6 @@ function extractConstUnionValues(schema: SchemaLike): string[] {
   );
 }
 
-const UI_FILES = ["ui/src/ui/types.ts", "ui/src/ui/ui-types.ts", "ui/src/ui/views/cron.ts"];
-
 const SWIFT_MODEL_CANDIDATES = [`${MACOS_APP_SOURCES_DIR}/CronModels.swift`];
 const SWIFT_STATUS_CANDIDATES = [`${MACOS_APP_SOURCES_DIR}/GatewayConnection.swift`];
 
@@ -61,20 +59,11 @@ async function resolveSwiftFiles(cwd: string, candidates: string[]): Promise<str
 }
 
 describe("cron protocol conformance", () => {
-  it("ui + swift include all cron delivery modes from gateway schema", async () => {
+  it("swift includes all cron delivery modes from gateway schema", async () => {
     const modes = extractDeliveryModes(CronDeliverySchema as SchemaLike);
     expect(modes.length).toBeGreaterThan(0);
 
     const cwd = process.cwd();
-    for (const relPath of UI_FILES) {
-      const content = await fs.readFile(path.join(cwd, relPath), "utf-8");
-      for (const mode of modes) {
-        expect(content.includes(`"${mode}"`), `${relPath} missing delivery mode ${mode}`).toBe(
-          true,
-        );
-      }
-    }
-
     const swiftModelFiles = await resolveSwiftFiles(cwd, SWIFT_MODEL_CANDIDATES);
     for (const relPath of swiftModelFiles) {
       const content = await fs.readFile(path.join(cwd, relPath), "utf-8");
@@ -85,13 +74,8 @@ describe("cron protocol conformance", () => {
     }
   });
 
-  it("cron status shape matches gateway fields in UI + Swift", async () => {
+  it("cron status shape matches gateway fields in Swift", async () => {
     const cwd = process.cwd();
-    const uiTypes = await fs.readFile(path.join(cwd, "ui/src/ui/types.ts"), "utf-8");
-    expect(uiTypes.includes("export type CronStatus")).toBe(true);
-    expect(uiTypes.includes("jobs:")).toBe(true);
-    expect(uiTypes.includes("jobCount")).toBe(false);
-
     const [swiftRelPath] = await resolveSwiftFiles(cwd, SWIFT_STATUS_CANDIDATES);
     const swiftPath = path.join(cwd, swiftRelPath);
     const swift = await fs.readFile(swiftPath, "utf-8");

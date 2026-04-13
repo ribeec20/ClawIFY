@@ -23,14 +23,14 @@ describe("loadIncludePatternsFromEnv", () => {
       "src/infra/update-runner.test.ts",
       42,
       "",
-      "ui/src/ui/views/chat.test.ts",
+      "src/wizard/setup.test.ts",
     ]);
 
     expect(
       loadIncludePatternsFromEnv({
         OPENCLAW_VITEST_INCLUDE_FILE: filePath,
       }),
-    ).toEqual(["src/infra/update-runner.test.ts", "ui/src/ui/views/chat.test.ts"]);
+    ).toEqual(["src/infra/update-runner.test.ts", "src/wizard/setup.test.ts"]);
   });
 });
 
@@ -44,14 +44,14 @@ describe("loadExtraExcludePatternsFromEnv", () => {
       "src/infra/update-runner.test.ts",
       42,
       "",
-      "ui/src/ui/views/chat.test.ts",
+      "src/wizard/setup.test.ts",
     ]);
 
     expect(
       loadExtraExcludePatternsFromEnv({
         OPENCLAW_VITEST_EXTRA_EXCLUDE_FILE: filePath,
       }),
-    ).toEqual(["src/infra/update-runner.test.ts", "ui/src/ui/views/chat.test.ts"]);
+    ).toEqual(["src/infra/update-runner.test.ts", "src/wizard/setup.test.ts"]);
   });
 
   it("throws when the configured file is not a JSON array", () => {
@@ -74,7 +74,7 @@ describe("unit vitest config", () => {
     expect(unitConfig.test?.runner).toBe("./test/non-isolated-runner.ts");
   });
 
-  it("keeps acp and ui tests out of the generic unit lane", () => {
+  it("keeps extension and tooling tests out of the generic unit lane", () => {
     const unitConfig = createUnitVitestConfig({});
     expect(unitConfig.test?.exclude).toEqual(expect.arrayContaining(["extensions/**", "test/**"]));
   });
