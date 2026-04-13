@@ -16,6 +16,11 @@ import {
   resolveOpenAiCompatibleHttpOperatorScopes,
 } from "./http-utils.js";
 import {
+  handleOAuthCallback,
+  handleOAuthProvidersList,
+  handleOAuthStart,
+} from "./oauth-proxy.js";
+import {
   authorizeOperatorScopesForMethod,
   resolveRequiredOperatorScopeForMethod,
 } from "./method-scopes.js";
@@ -600,6 +605,41 @@ export async function handleManagementHttpRequest(
       auth: opts.auth,
       scopes,
     });
+    return true;
+  }
+
+  // --- OAuth proxy routes (custom, not gateway-method-backed) ---
+  if (requestPath === `${MANAGEMENT_API_PREFIX}/oauth/start` && method === "POST") {
+    const requestAuth = await authorizeGatewayHttpRequestOrReply({
+      req, res, auth: opts.auth,
+      trustedProxies: opts.trustedProxies,
+      allowRealIpFallback: opts.allowRealIpFallback,
+      rateLimiter: opts.rateLimiter,
+    });
+    if (!requestAuth) return true;
+    await handleOAuthStart(req, res);
+    return true;
+  }
+  if (requestPath === `${MANAGEMENT_API_PREFIX}/oauth/callback` && method === "POST") {
+    const requestAuth = await authorizeGatewayHttpRequestOrReply({
+      req, res, auth: opts.auth,
+      trustedProxies: opts.trustedProxies,
+      allowRealIpFallback: opts.allowRealIpFallback,
+      rateLimiter: opts.rateLimiter,
+    });
+    if (!requestAuth) return true;
+    await handleOAuthCallback(req, res);
+    return true;
+  }
+  if (requestPath === `${MANAGEMENT_API_PREFIX}/oauth/providers` && method === "GET") {
+    const requestAuth = await authorizeGatewayHttpRequestOrReply({
+      req, res, auth: opts.auth,
+      trustedProxies: opts.trustedProxies,
+      allowRealIpFallback: opts.allowRealIpFallback,
+      rateLimiter: opts.rateLimiter,
+    });
+    if (!requestAuth) return true;
+    handleOAuthProvidersList(req, res);
     return true;
   }
 
