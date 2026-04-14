@@ -1,15 +1,22 @@
-import { type ChildProcessWithoutNullStreams, execSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import {
+  type GatewayHandle,
+  serve,
+} from "../../src/gateway/serve.js";
+
+// Warm the gateway server module graph at helper-import time so the first
+// serve() call doesn't pay the ~90s dynamic-import cost during vitest's
+// default 90s beforeAll timeout. Subsequent serve() calls reuse the cached
+// module graph.
+await import("../../src/gateway/server.js");
 
 export const OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 
-const GATEWAY_START_TIMEOUT_MS = 60_000;
-const GATEWAY_STOP_TIMEOUT_MS = 3_000;
 const OLLAMA_PREFLIGHT_TIMEOUT_MS = 5_000;
 
 // ---------------------------------------------------------------------------
@@ -28,37 +35,48 @@ const getFreePort = async (): Promise<number> => {
   return addr.port;
 };
 
-async function waitForGatewayReady(
-  proc: ChildProcessWithoutNullStreams,
-  chunksOut: string[],
-  chunksErr: string[],
-  port: number,
-  timeoutMs: number,
-): Promise<void> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    if (proc.exitCode !== null) {
-      const stdout = chunksOut.join("");
-      const stderr = chunksErr.join("");
-      throw new Error(
-        `gateway exited before listening (code=${String(proc.exitCode)} signal=${String(proc.signalCode)})\n` +
-          `--- stdout ---\n${stdout}\n--- stderr ---\n${stderr}`,
-      );
-    }
+// Env vars the in-process gateway needs configured — either to point at our
+// temp config/state dirs, to keep startup minimal, or to override the
+// vitest-harness flags that would otherwise make the gateway behave like a
+// running test-mock rather than a live server with a real provider.
+const ENV_KEYS_TO_OVERRIDE = [
+  "HOME",
+  "USERPROFILE",
+  "OPENCLAW_CONFIG_PATH",
+  "OPENCLAW_STATE_DIR",
+  "OPENCLAW_SKIP_CHANNELS",
+  "OPENCLAW_SKIP_GMAIL_WATCHER",
+  "OPENCLAW_SKIP_CRON",
+  "OPENCLAW_SKIP_BROWSER_CONTROL_SERVER",
+  "OPENCLAW_SKIP_CANVAS_HOST",
+  "OPENCLAW_TEST_MINIMAL_GATEWAY",
+  "OPENCLAW_GATEWAY_MANAGEMENT_API",
+  "VITEST",
+  "OPENCLAW_TEST_FAST",
+  "OPENCLAW_STRICT_FAST_REPLY_CONFIG",
+  "OPENCLAW_SKIP_PROVIDERS",
+  "OPENCLAW_BUNDLED_PLUGINS_DIR",
+] as const;
 
-    // Wait for stdout to contain "ready" — the gateway logs this when fully initialized.
-    const combined = chunksOut.join("");
-    if (combined.includes("ready")) return;
+type EnvSnapshot = Record<(typeof ENV_KEYS_TO_OVERRIDE)[number], string | undefined>;
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+function captureEnvSnapshot(): EnvSnapshot {
+  const snap = {} as EnvSnapshot;
+  for (const key of ENV_KEYS_TO_OVERRIDE) {
+    snap[key] = process.env[key];
   }
+  return snap;
+}
 
-  const stdout = chunksOut.join("");
-  const stderr = chunksErr.join("");
-  throw new Error(
-    `timeout waiting for gateway ready on port ${port}\n` +
-      `--- stdout ---\n${stdout}\n--- stderr ---\n${stderr}`,
-  );
+function restoreEnvSnapshot(snap: EnvSnapshot): void {
+  for (const key of ENV_KEYS_TO_OVERRIDE) {
+    const prev = snap[key];
+    if (prev === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = prev;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +112,10 @@ export async function discoverOllamaModel(
     const models = data.models ?? [];
     if (models.length === 0) return null;
 
-    const picked = models[0]!;
+    // Prefer qwen3.5:9b when available — smaller models are unreliable at the
+    // tool-calling patterns these tests require.
+    const preferred = models.find((m) => m.name === "qwen3.5:9b");
+    const picked = preferred ?? models[0]!;
 
     // Try to get context window from /api/show
     let contextWindow = 32768;
@@ -138,17 +159,18 @@ export type OllamaGatewayInstance = {
   configPath: string;
   workspaceDir: string;
   model: OllamaModel;
-  child: ChildProcessWithoutNullStreams;
-  stdout: string[];
-  stderr: string[];
+  handle: GatewayHandle;
+  envSnapshot: EnvSnapshot;
 };
 
 /**
- * Spawn a real gateway child process configured to use a local Ollama provider.
+ * Start an in-process gateway configured to use a local Ollama provider.
  * The caller must pass a discovered model from `discoverOllamaModel()`.
  * Optional `extraConfig` is merged into the gateway config (e.g. for clawify custom tools).
- * Waits until the gateway is ready before resolving.
- * Cleans up on failure.
+ *
+ * Uses the `serve()` SDK instead of spawning `clawify serve` as a child process.
+ * The returned handle's `stop()` shuts the gateway down cleanly; `stopOllamaGatewayInstance`
+ * additionally restores the pre-call env and removes the temp directory.
  */
 export async function spawnOllamaGatewayInstance(
   model: OllamaModel,
@@ -205,56 +227,41 @@ export async function spawnOllamaGatewayInstance(
 
   await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
 
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  let child: ChildProcessWithoutNullStreams | null = null;
+  const envSnapshot = captureEnvSnapshot();
 
+  process.env.HOME = homeDir;
+  process.env.USERPROFILE = homeDir;
+  process.env.OPENCLAW_CONFIG_PATH = configPath;
+  process.env.OPENCLAW_STATE_DIR = stateDir;
+  process.env.OPENCLAW_SKIP_CHANNELS = "1";
+  process.env.OPENCLAW_SKIP_GMAIL_WATCHER = "1";
+  process.env.OPENCLAW_SKIP_CRON = "1";
+  process.env.OPENCLAW_SKIP_BROWSER_CONTROL_SERVER = "1";
+  process.env.OPENCLAW_SKIP_CANVAS_HOST = "1";
+  process.env.OPENCLAW_GATEWAY_MANAGEMENT_API = "1";
+  // VITEST=1 + OPENCLAW_TEST_MINIMAL_GATEWAY=1 trips the minimalTestGateway branch
+  // in server.impl.ts, which skips the sidecar/channel startup phase that would
+  // otherwise keep startGatewayServer awaiting for tens of seconds even with
+  // OPENCLAW_SKIP_CHANNELS set. With it, serve() resolves promptly after the
+  // management API is bound — providers are still loaded because plugin
+  // bootstrap runs earlier than sidecars.
+  process.env.VITEST = "1";
+  process.env.OPENCLAW_TEST_MINIMAL_GATEWAY = "1";
+  // Clear OPENCLAW_TEST_FAST so config/path resolution honours our temp
+  // OPENCLAW_CONFIG_PATH/OPENCLAW_STATE_DIR instead of diverting to the
+  // test-fast paths set by vitest's global test-env setup.
+  process.env.OPENCLAW_TEST_FAST = "";
+  process.env.OPENCLAW_STRICT_FAST_REPLY_CONFIG = "";
+  process.env.OPENCLAW_SKIP_PROVIDERS = "";
+
+  let handle: GatewayHandle | null = null;
   try {
-    child = spawn(
-      "node",
-      [
-        "dist/index.js",
-        "gateway",
-        "--port",
-        String(port),
-        "--bind",
-        "loopback",
-        "--allow-unconfigured",
-      ],
-      {
-        cwd: process.cwd(),
-        env: {
-          ...process.env,
-          HOME: homeDir,
-          USERPROFILE: homeDir,
-          OPENCLAW_CONFIG_PATH: configPath,
-          OPENCLAW_STATE_DIR: stateDir,
-          // NOTE: OPENCLAW_SKIP_PROVIDERS is intentionally NOT set so the
-          // Ollama provider remains active for these integration tests.
-          OPENCLAW_SKIP_CHANNELS: "1",
-          OPENCLAW_SKIP_GMAIL_WATCHER: "1",
-          OPENCLAW_SKIP_CRON: "1",
-          OPENCLAW_SKIP_BROWSER_CONTROL_SERVER: "1",
-          OPENCLAW_SKIP_CANVAS_HOST: "1",
-          OPENCLAW_TEST_MINIMAL_GATEWAY: "1",
-          OPENCLAW_GATEWAY_MANAGEMENT_API: "1",
-          // Override test-env flags that vitest setup injects — these suppress
-          // plugin loading and provider discovery in the child gateway process.
-          OPENCLAW_TEST_FAST: "",
-          OPENCLAW_STRICT_FAST_REPLY_CONFIG: "",
-          OPENCLAW_SKIP_PROVIDERS: "",
-          VITEST: "",
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (d: unknown) => stdout.push(String(d)));
-    child.stderr?.on("data", (d: unknown) => stderr.push(String(d)));
-
-    await waitForGatewayReady(child, stdout, stderr, port, GATEWAY_START_TIMEOUT_MS);
+    handle = await serve({
+      port,
+      bind: "loopback",
+      auth: { mode: "none" },
+      allowUnconfigured: true,
+    });
 
     return {
       port,
@@ -264,23 +271,18 @@ export async function spawnOllamaGatewayInstance(
       configPath,
       workspaceDir,
       model,
-      child,
-      stdout,
-      stderr,
+      handle,
+      envSnapshot,
     };
   } catch (err) {
-    if (child && child.exitCode === null && !child.killed) {
+    if (handle) {
       try {
-        if (process.platform === "win32" && child.pid) {
-          execSync(`taskkill /pid ${child.pid} /T /F`, { stdio: "ignore" });
-        } else {
-          child.kill("SIGKILL");
-        }
+        await handle.stop({ reason: "startup-failure" });
       } catch {
         // ignore
       }
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
     }
+    restoreEnvSnapshot(envSnapshot);
     try {
       await fs.rm(homeDir, { recursive: true, force: true });
     } catch {
@@ -291,52 +293,22 @@ export async function spawnOllamaGatewayInstance(
 }
 
 /**
- * Gracefully stop an Ollama gateway instance and remove its temp directory.
+ * Gracefully stop an Ollama gateway instance, restore the pre-start env,
+ * and remove its temp directory.
  */
 export async function stopOllamaGatewayInstance(inst: OllamaGatewayInstance): Promise<void> {
-  const pid = inst.child.pid;
-
-  if (inst.child.exitCode === null && !inst.child.killed) {
-    // On Windows, SIGTERM/SIGKILL don't work reliably. Use taskkill to
-    // force-terminate the process tree so file locks are released.
-    if (process.platform === "win32" && pid) {
-      try {
-        execSync(`taskkill /pid ${pid} /T /F`, { stdio: "ignore" });
-      } catch {
-        // ignore — process may already be gone
-      }
-    } else {
-      try {
-        inst.child.kill("SIGTERM");
-      } catch {
-        // ignore
-      }
-    }
+  try {
+    await inst.handle.stop({ reason: "test cleanup" });
+  } catch {
+    // ignore — tests should still proceed to cleanup
   }
 
-  // Wait for the process to actually exit
-  await Promise.race([
-    new Promise<void>((resolve) => {
-      if (inst.child.exitCode !== null) return resolve();
-      inst.child.once("exit", () => resolve());
-    }),
-    new Promise<void>((resolve) => setTimeout(resolve, GATEWAY_STOP_TIMEOUT_MS)),
-  ]);
-
-  // Force kill if still alive (non-Windows fallback)
-  if (inst.child.exitCode === null && !inst.child.killed) {
-    try {
-      inst.child.kill("SIGKILL");
-    } catch {
-      // ignore
-    }
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
-  }
+  restoreEnvSnapshot(inst.envSnapshot);
 
   try {
     await fs.rm(inst.homeDir, { recursive: true, force: true });
   } catch {
-    // On Windows, files may still be locked briefly after process exit
+    // On Windows, files may still be locked briefly after shutdown
   }
 }
 

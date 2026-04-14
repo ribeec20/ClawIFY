@@ -10,6 +10,9 @@ import type {
 } from "../../config/config.js";
 import {
   CONFIG_PATH,
+  GATEWAY_AUTH_MODES,
+  GATEWAY_PROFILE_MODES,
+  GATEWAY_TAILSCALE_MODES,
   loadConfig,
   readConfigFileSnapshot,
   resolveStateDir,
@@ -99,15 +102,6 @@ const GATEWAY_RUN_BOOLEAN_KEYS = [
 ] as const;
 
 const SUPERVISED_GATEWAY_LOCK_RETRY_MS = 5000;
-
-const GATEWAY_AUTH_MODES: readonly GatewayAuthMode[] = [
-  "none",
-  "token",
-  "password",
-  "trusted-proxy",
-];
-const GATEWAY_PROFILE_MODES: readonly GatewayProfileMode[] = ["default", "api-only"];
-const GATEWAY_TAILSCALE_MODES: readonly GatewayTailscaleMode[] = ["off", "serve", "funnel"];
 
 function warnInlinePasswordFlag() {
   defaultRuntime.error(

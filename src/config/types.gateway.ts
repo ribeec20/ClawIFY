@@ -2,6 +2,14 @@ import type { SecretInput } from "./types.secrets.js";
 
 export type GatewayBindMode = "auto" | "lan" | "loopback" | "custom" | "tailnet";
 
+export const GATEWAY_BIND_MODES: readonly GatewayBindMode[] = [
+  "auto",
+  "lan",
+  "loopback",
+  "custom",
+  "tailnet",
+];
+
 export type GatewayTlsConfig = {
   /** Enable TLS for the gateway server. */
   enabled?: boolean;
@@ -104,6 +112,13 @@ export type GatewayControlUiConfig = {
 
 export type GatewayAuthMode = "none" | "token" | "password" | "trusted-proxy";
 
+export const GATEWAY_AUTH_MODES: readonly GatewayAuthMode[] = [
+  "none",
+  "token",
+  "password",
+  "trusted-proxy",
+];
+
 /**
  * Configuration for trusted reverse proxy authentication.
  * Used when Clawdbot runs behind an identity-aware proxy (Pomerium, Caddy + OAuth, etc.)
@@ -159,6 +174,8 @@ export type GatewayAuthRateLimitConfig = {
 };
 
 export type GatewayTailscaleMode = "off" | "serve" | "funnel";
+
+export const GATEWAY_TAILSCALE_MODES: readonly GatewayTailscaleMode[] = ["off", "serve", "funnel"];
 
 export type GatewayTailscaleConfig = {
   /** Tailscale exposure mode for the Gateway control UI. */
@@ -378,6 +395,8 @@ export type GatewayWebchatConfig = {
 };
 
 export type GatewayProfileMode = "default" | "api-only";
+
+export const GATEWAY_PROFILE_MODES: readonly GatewayProfileMode[] = ["default", "api-only"];
 
 export type GatewayChannelsConfig = {
   /** If false, skip channel startup during gateway boot (default: true). */

@@ -10,7 +10,9 @@ title: "Clawify SDK"
 
 # Clawify SDK
 
-Use the Clawify SDK when your app needs to configure and drive a running Gateway using code.
+Use the Clawify SDK when your app needs to configure and drive a *running* Gateway using code.
+
+If you instead want to start the gateway in-process (instead of spawning `clawify serve` as a child process), see [the `server` subpath](./server.md) which exports `serve(opts)`.
 
 This SDK wraps management API routes under `/v1/management/*` and gives you package-style primitives:
 

@@ -44,6 +44,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./sdk": "./dist/gateway/clawify-sdk.js",
+    "./server": "./dist/gateway/serve.js",
     "./plugin-sdk": {
       "types": "./dist/plugin-sdk/index.d.ts",
       "default": "./dist/plugin-sdk/index.js"

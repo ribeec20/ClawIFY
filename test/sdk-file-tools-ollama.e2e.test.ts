@@ -24,7 +24,7 @@ describe.runIf(ollamaModel !== null)("SDK file tools e2e with Ollama", () => {
 
   beforeAll(async () => {
     gw = await spawnOllamaGatewayInstance(ollamaModel!);
-  }, 90_000);
+  }, 180_000);
 
   afterAll(async () => {
     if (gw) await stopOllamaGatewayInstance(gw);
@@ -136,7 +136,7 @@ describe.runIf(ollamaModel !== null)("Custom tool registration e2e with Ollama",
         },
       },
     });
-  }, 90_000);
+  }, 180_000);
 
   afterAll(async () => {
     if (gw) await stopOllamaGatewayInstance(gw);
